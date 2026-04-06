@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WASM Agent Demo</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+    }
+    .agent-status {
+      padding: 10px;
+      background: #e8f5e9;
+      border-radius: 4px;
+      margin: 10px 0;
+    }
+    #chat-box {
+      width: 100%;
+      height: 300px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px;
+      margin: 10px 0;
+      resize: vertical;
+    }
+    .button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    .button:hover {
+      background: #0056b3;
+    }
+    .sub-agent {
+      margin: 10px 0;
+      padding: 10px;
+      background: #f8f9fa;
+      border-left: 3px solid #007bff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🤖 WASM Agent Demo</h1>
+    <div id="agent-status" class="agent-status" style="display: none;"></div>
+    <div id="chat-container">
+      <div id="chat-history"></div>
+      <textarea id="chat-box" placeholder="Type your message here..."></textarea>
+      <div>
+        <button class="button" onclick="sendChat()">Chat</button>
+        <button class="button" onclick="search()">Search Web</button>
+        <button class="button" onclick="createSubAgent()">Create Sub-Agent</button>
+      </div>
+    </div>
+    <div id="sub-agents-container"></div>
+  </div>
+
+  <script type="module">
+    import { initAgent } from './src/js/main.js';
+
+    // Initialize agent
+    window.wasmAgent = await initAgent({
+      agent: {
+        name: 'Demo Agent',
+        version: '1.0.0'
+      },
+      openWebUI: {
+        baseUrl: 'http://localhost:3000',
+        apiKey: '' // Your API key if needed
+      }
+    });
+
+    // DOM ready
+    document.addEventListener('DOMContentLoaded', () => {
+      const statusEl = document.getElementById('agent-status');
+      const chatHistory = document.getElementById('chat-history');
+      const subAgentsContainer = document.getElementById('sub-agents-container');
+
+      // Initialize chat history
+      updateChatHistory([]);
+      statusEl.style.display = 'block';
+      statusEl.textContent = '✅ Agent initialized and ready!';
+    });
+
+    // Send chat message
+    window.sendChat = async function() {
+      const chatBox = document.getElementById('chat-box');
+      const prompt = chatBox.value;
+      if (!prompt.trim()) return;
+
+      updateChatHistory([{ role: 'user', content: prompt }]);
+      chatBox.value = '';
+
+      try {
+        const agent = window.wasmAgent;
+        const response = await agent.chat(prompt);
+        updateChatHistory([...document.querySelectorAll('[role="user"]').map(msg => msg), 
+                             { role: 'assistant', content: response }]);
+      } catch (error) {
+        console.error('Chat error:', error);
+        alert('Error: ' + error.message);
+      }
+    };
+
+    // Search web
+    window.search = async function() {
+      try {
+        const agent = window.wasmAgent;
+        const results = await agent.search('web search');
+        console.log('Search results:', results);
+      } catch (error) {
+        console.error('Search error:', error);
+      }
+    };
+
+    // Create sub-agent
+    window.createSubAgent = async function() {
+      const agent = window.wasmAgent;
+      const agentId = await agent.createSubAgent('search', { description: 'Search agent' });
+      console.log('Created sub-agent:', agentId);
+    };
+
+    // Update chat history display
+    function updateChatHistory(messages) {
+      const container = document.getElementById('chat-history');
+      container.innerHTML = messages
+        .map(msg => 
+          `<div role="${msg.role}">${msg.content}</div>`
+        )
+        .join('');
+    }
+
+    // Add sub-agent to UI
+    function addSubAgent(agent) {
+      const container = document.getElementById('sub-agents-container');
+      container.innerHTML += `
+        <div class="sub-agent">
+          <strong>${agent.config.name}</strong>
+          <div>${agent.config.description}</div>
+          <div>Status: ${agent.status}</div>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>
